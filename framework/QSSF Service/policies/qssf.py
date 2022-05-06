@@ -1,4 +1,5 @@
 from .policy import Policy
+import pandas as pd
 import run
 
 class QuasiShortestServiceFirst(Policy):
@@ -10,7 +11,7 @@ class QuasiShortestServiceFirst(Policy):
 
     def simulate(self):
         prev_index = -1
-
+        results = []
         while self.end_job_num != self.total_job_num:
             new_job_num = 0
 
@@ -26,6 +27,7 @@ class QuasiShortestServiceFirst(Policy):
                     self.end_job_num += 1
                     assert self._vc.release_resource(job) == True
                     self.run_list.remove(job)
+                    results.append(job)
                     if self.estimator.name != 'LGBEstimator' and self.estimator.name != 'PhillyEstimator':
                         self.estimator.update_train_data(job)
 
@@ -75,3 +77,5 @@ class QuasiShortestServiceFirst(Policy):
             self.time += 60
 
         self.log_recorder(self._name)
+
+        return results

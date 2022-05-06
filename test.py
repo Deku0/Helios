@@ -1,19 +1,17 @@
 from unicodedata import name
 import multiprocessing
-
+import pandas as pd
 def fun():
     print("process")
 
 
 if __name__ == '__main__':
-    # demo(1,2,3,4,5)
-    # a = 0
-    # assert a > 1
-    process_num = 3
-    pool = multiprocessing.Pool(processes=process_num) 
-    for i in range(process_num):
-        pool.apply_async(fun)
-    
-    pool.close()
-    pool.join()
+    # x = lambda a : a + 10
+    # print(x(5))
+    columns = ['jobname', 'vc']
+    s = pd.Series([1,2])
+    df = pd.DataFrame(columns=columns)
+    df.append(s, ignore_index=True)
+    print("ssss")
+    print(df)
     print("done")

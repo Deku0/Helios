@@ -86,9 +86,15 @@ def simulate_run(args):
                 all_args_list.append((trace, CLUSTER.vc_list[i], args.placer, log_dir, "SpawnPoolWorker-"+str(i+1), args, args.scheduler, start_ts))
 
     process_num = len(all_args_list)
-    with multiprocessing.Pool(processes=process_num) as p:
-        results = [p.apply_async(utils.simulate_vc, args_list) for args_list in all_args_list]
-        results = [result.get() for result in results]
+    results = []
+    pool = multiprocessing.Pool(process_num)
+    for i in range(len(all_args_list)):
+        result = pool.apply_async(utils.simulate_vc, all_args_list[i])
+        results.append(result)
+    print('----start-----') #调用join之前，先调用close函数，否则会出错。
+    pool.close()#关闭进程池，关闭后就不再接受新的请求，即开始执行任务。
+    pool.join()## join函数等待所有子进程结束，才会执行主进程之后的代码
+    print('-----end------')
 
     if args.sweep:
         for policy in utils.get_available_schedulers():
@@ -124,7 +130,7 @@ def simulate():
                               '(use as many as available if not specified)'))
     parser.add_argument('--timeout', default=1209600, type=int,
                         help='Timeout (in seconds), default 14 days')
-    parser.add_argument('--num_gpus_per_node', type=int, default=16,
+    parser.add_argument('--num_gpus_per_node', type=int, default=8,
                         help=('Number of GPUs per node'))
     parser.add_argument('--num_cpus_per_node', type=int, default=96,
                         help=('Number of CPU cores per node'))

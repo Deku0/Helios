@@ -3,6 +3,7 @@ import os
 import logging
 import datetime
 import pandas as pd
+import numpy as np
 from job import Job, Trace
 from policies import ShortestJobFirst, FirstInFirstOut, ShortestRemainingTimeFirst, QuasiShortestServiceFirst
 sys.path.append('..')
@@ -28,8 +29,22 @@ def simulate_vc(trace, vc, placement, log_dir, process, logger_args, policy, sta
     elif policy == 'qssf':
         scheduler = QuasiShortestServiceFirst(
             trace, vc, placement, log_dir, logger, start_ts, args[0])
-    scheduler.simulate()
+    results = scheduler.simulate()
     logger.info(f'Finish {vc.vc_name}')
+    # path = '{log_dir}/logfile/{logger_args.scheduler}/{process}_{logger_args.placer}'
+    logger.info(f'begin to save')
+    file = f'{process}_results.npy'
+    results = np.array(results)
+    logger.info(len(results))
+    # results.to_csv(file, index=False)
+    columns = ['jobname', 'vc', 'user', 'state', 'submit_time', 'gpu_num', 'duration', 'remain', 'start_time', 
+                'end_time', 'ckpt_times', 'queue', 'jct', 'status', 'nodes', 'priority', 'random']
+    df = pd.DataFrame(columns=columns)
+    logger.info("dataframe:")
+    logger.info(len(results))
+    np.save(file, results)
+    logger.info(f'save')
+    print("save")
     return True
 
 def get_available_schedulers():
