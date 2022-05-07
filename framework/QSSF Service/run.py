@@ -20,26 +20,28 @@ def create_logger(process, log_dir, args):
     logger = utils.logger_init(file=f'{log_dir}/logfile/{args.scheduler}/{process}_{args.placer}')
     return logger
 
-def simulate_run(args):
+def simulate_run(parameters):
     code_start = time.perf_counter()
 
     '''Logger Setting'''
-    log_dir = f'{args.log_dir}/{args.experiment_name}'
+    log_dir = parameters['log_dir']
+    experiment_name = parameters['experiment_name']
+    log_dir = f'{log_dir}/{experiment_name}'
 
     '''Infrastructure & Trace Initialization'''
-    if 'Philly' in args.experiment_name:
+    if 'Philly' in parameters['experiment_name']:
         trace_range = ('2017-10-01 00:00:00', '2017-11-30 23:59:00')
         trace_df, start_ts = utils.trace_philly_process(
-            args.trace_dir, trace_range)
+            parameters['trace_dir'], trace_range)
     else:
-        if 'Sept' in args.experiment_name:
+        if 'Sept' in parameters['experiment_name']:
             trace_range = ('2020-09-01 00:00:00', '2020-09-26 23:59:00')
             trace_df, start_ts = utils.trace_process(
-                args.trace_dir, trace_range)
-        elif 'July' in args.experiment_name:
+                parameters['trace_dir'], trace_range)
+        elif 'July' in parameters['experiment_name']:
             trace_range = ('2020-07-01 00:00:00', '2020-07-31 23:59:00')
             trace_df, start_ts = utils.trace_process(
-                args.trace_dir, trace_range)
+                parameters['trace_dir'], trace_range)
         else:
             raise ValueError
 
@@ -47,16 +49,16 @@ def simulate_run(args):
 
 
 
-    vc_dict = pd.read_pickle(args.trace_dir+'/vc_dict_homo.pkl')
+    vc_dict = pd.read_pickle(parameters['trace_dir']+'/vc_dict_homo.pkl')
     CLUSTER = cluster.Cluster(
-        vc_dict, args.num_gpus_per_node, args.num_cpus_per_node)
+        vc_dict, parameters['num_gpus_per_node'], parameters['num_cpus_per_node'])
 
-    if 'Philly' in args.experiment_name:
-        estimator = PhillyEstimator(args)
+    if 'Philly' in parameters['experiment_name']:
+        estimator = PhillyEstimator(parameters)
     else:
         # estimator = LGBEstimator(args)
         # estimator = NaiveEstimator(args)
-        estimator = CombinedEstimator(args)
+        estimator = CombinedEstimator(parameters)
 
     '''
     Sweep ON: Run All Scheduler Policies in One Experiment
@@ -141,4 +143,15 @@ def simulate():
 if __name__ == '__main__':
     #输入:判断条件：某类任务的jct
     #返回jct
+    parameters = {
+        'experiment_name':'Philly',
+        'trace_dir':'./data/Philly',
+        'log_dir':'./log',
+        'scheduler':'qssf',
+        'sweep':False,
+        'processes':None,
+        'timeout':1209600,
+        'num_gpus_per_node':8,
+        'num_cpus_per_node':96
+    }
     simulate()

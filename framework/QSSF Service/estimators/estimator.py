@@ -6,15 +6,15 @@ random.seed(1)
 
 
 class NaiveEstimator:
-    def __init__(self, args):
-        if 'Sept' in args.experiment_name:
+    def __init__(self, parameters):
+        if 'Sept' in parameters['experiment_name']:
             trace_range = ('2020-09-01 00:00:00', '2020-09-26 23:59:00')
-        elif 'July' in args.experiment_name:
+        elif 'July' in parameters['experiment_name']:
             trace_range = ('2020-07-01 00:00:00', '2020-07-31 23:59:00')
         else:
             raise ValueError
         self.train_data, _ = utils.train_data_loader(
-            args.trace_dir, trace_range)
+            parameters['trace_dir'], trace_range)
         self.job_names = self.train_data['jobname'].unique()
         self.name = 'NaiveEstimator'
 
@@ -75,9 +75,10 @@ class NaiveEstimator:
 
 
 class LGBEstimator:
-    def __init__(self, args):
-        self.data = pd.read_csv(f'./estimators/{args.experiment_name}_lgb.csv')
-        self.args = args
+    def __init__(self, parameters):
+        experiment_name = parameters['experiment_name']
+        self.data = pd.read_csv(f'./estimators/{experiment_name}_lgb.csv')
+        self.parameters = parameters
         self.name = 'LGBEstimator'
 
     def inference(self, job):
@@ -86,18 +87,19 @@ class LGBEstimator:
 
 
 class CombinedEstimator:
-    def __init__(self, args):
-        if 'Sept' in args.experiment_name:
+    def __init__(self, parameters):
+        if 'Sept' in parameters['experiment_name']:
             trace_range = ('2020-09-01 00:00:00', '2020-09-26 23:59:00')
-        elif 'July' in args.experiment_name:
+        elif 'July' in parameters['experiment_name']:
             trace_range = ('2020-07-01 00:00:00', '2020-07-31 23:59:00')
         else:
             raise ValueError
 
         self.train_data, _ = utils.train_data_loader(
-            args.trace_dir, trace_range)
+            parameters['trace_dir'], trace_range)
         self.job_names = self.train_data['jobname'].unique()
-        self.data = pd.read_csv(f'./estimators/{args.experiment_name}_lgb.csv')
+        experiment_name = parameters['experiment_name']
+        self.data = pd.read_csv(f'./estimators/{experiment_name}_lgb.csv')
         self.name = 'CombinedEstimator'
 
         '''Hyperparameters'''
@@ -172,9 +174,9 @@ class CombinedEstimator:
 
 
 class PhillyEstimator:
-    def __init__(self, args):
+    def __init__(self, parameters):
         self.data = pd.read_csv(f'./estimators/Philly_lgb.csv')
-        self.args = args
+        self.parameters = parameters
         self.name = 'PhillyEstimator'
 
     def inference(self, job):

@@ -1,3 +1,4 @@
+from collections import defaultdict
 import sys
 import os
 import logging
@@ -6,6 +7,7 @@ import pandas as pd
 import numpy as np
 from job import Job, Trace
 from policies import ShortestJobFirst, FirstInFirstOut, ShortestRemainingTimeFirst, QuasiShortestServiceFirst
+from collections import defaultdict
 sys.path.append('..')
 
 
@@ -17,6 +19,9 @@ def create_logger(process, log_dir, logger_args):
 
 def simulate_vc(trace, vc, placement, log_dir, process, logger_args, policy, start_ts, *args):
     logger = create_logger(process, log_dir, logger_args)
+    columns = ['jobname', 'vc', 'user', 'state', 'submit_time', 'gpu_num', 'duration', 'remain', 'start_time', 
+                'end_time', 'ckpt_times', 'queue', 'jct', 'status', 'nodes', 'priority', 'random']
+
     if policy == 'sjf':
         scheduler = ShortestJobFirst(
             trace, vc, placement, log_dir, logger, start_ts)
@@ -29,22 +34,23 @@ def simulate_vc(trace, vc, placement, log_dir, process, logger_args, policy, sta
     elif policy == 'qssf':
         scheduler = QuasiShortestServiceFirst(
             trace, vc, placement, log_dir, logger, start_ts, args[0])
-    results = scheduler.simulate()
+    # 模拟
+    finished_jobs = scheduler.simulate()
     logger.info(f'Finish {vc.vc_name}')
+
+    #将结果转换为dataframe并保存
     # path = '{log_dir}/logfile/{logger_args.scheduler}/{process}_{logger_args.placer}'
+    file = f'{log_dir}/logfile/{logger_args.scheduler}/{process}_results.csv'
     logger.info(f'begin to save')
-    file = f'{process}_results.npy'
-    results = np.array(results)
-    logger.info(len(results))
-    # results.to_csv(file, index=False)
-    columns = ['jobname', 'vc', 'user', 'state', 'submit_time', 'gpu_num', 'duration', 'remain', 'start_time', 
-                'end_time', 'ckpt_times', 'queue', 'jct', 'status', 'nodes', 'priority', 'random']
-    df = pd.DataFrame(columns=columns)
-    logger.info("dataframe:")
-    logger.info(len(results))
-    np.save(file, results)
-    logger.info(f'save')
-    print("save")
+    finished_jobs_dict = defaultdict(list)
+    finished_jobs = np.array(finished_jobs)
+    for job in finished_jobs:
+        for column in columns:
+            finished_jobs_dict[column].append(job[column])
+    finished_jobs_df = pd.DataFrame(finished_jobs_dict)
+    finished_jobs_df.to_csv(file,index=0)
+    logger.info(f"saved successfully")
+
     return True
 
 def get_available_schedulers():
