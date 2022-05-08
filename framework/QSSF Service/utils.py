@@ -1,4 +1,3 @@
-from collections import defaultdict
 import sys
 import os
 import logging
@@ -11,14 +10,16 @@ from collections import defaultdict
 sys.path.append('..')
 
 
-def create_logger(process, log_dir, logger_args):
+def create_logger(process, log_dir, parameters):
+    scheduler = parameters['scheduler']
+    placer = parameters['placer']
     if not os.path.exists(log_dir):
-        os.makedirs(log_dir + '/logfile/'+ logger_args.scheduler)
-    logger = logger_init(file=f'{log_dir}/logfile/{logger_args.scheduler}/{process}_{logger_args.placer}')
+        os.makedirs(log_dir + '/logfile/'+ scheduler)
+    logger = logger_init(file=f'{log_dir}/logfile/{scheduler}/{process}_{placer}')
     return logger
 
-def simulate_vc(trace, vc, placement, log_dir, process, logger_args, policy, start_ts, *args):
-    logger = create_logger(process, log_dir, logger_args)
+def simulate_vc(trace, vc, placement, log_dir, process, parameters, policy, start_ts, *args):
+    logger = create_logger(process, log_dir, parameters)
     columns = ['jobname', 'vc', 'user', 'state', 'submit_time', 'gpu_num', 'duration', 'remain', 'start_time', 
                 'end_time', 'ckpt_times', 'queue', 'jct', 'status', 'nodes', 'priority', 'random']
 
@@ -40,7 +41,8 @@ def simulate_vc(trace, vc, placement, log_dir, process, logger_args, policy, sta
 
     #将结果转换为dataframe并保存
     # path = '{log_dir}/logfile/{logger_args.scheduler}/{process}_{logger_args.placer}'
-    file = f'{log_dir}/logfile/{logger_args.scheduler}/{process}_results.csv'
+    scheduler = parameters['scheduler']
+    file = f'{log_dir}/logfile/{scheduler}/results/{process}_results.csv'
     logger.info(f'begin to save')
     finished_jobs_dict = defaultdict(list)
     finished_jobs = np.array(finished_jobs)
@@ -50,7 +52,6 @@ def simulate_vc(trace, vc, placement, log_dir, process, logger_args, policy, sta
     finished_jobs_df = pd.DataFrame(finished_jobs_dict)
     finished_jobs_df.to_csv(file,index=0)
     logger.info(f"saved successfully")
-
     return True
 
 def get_available_schedulers():

@@ -1,4 +1,3 @@
-
 from unittest import result
 import pandas as pd
 import time
@@ -13,14 +12,29 @@ import cluster
 from estimators import NaiveEstimator, LGBEstimator, CombinedEstimator, PhillyEstimator
 os.environ['NUMEXPR_MAX_THREADS'] = str(os.cpu_count())
 
+def get_average_queue(rules, df):
+    answer = {}
+    for k, v in rules.items():
+        values = []
+        for index, row in df.iterrows():
+            if v(row):
+                values.append(row['queue'])
+        answer['queue_'+k] = round(sum(values)/len(values), 4)
 
-def create_logger(process, log_dir, args):
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir + '/logfile/'+ args.scheduler)
-    logger = utils.logger_init(file=f'{log_dir}/logfile/{args.scheduler}/{process}_{args.placer}')
-    return logger
+    return answer
 
-def simulate_run(parameters):
+def get_average_jct(rules, df):
+    answer = {}
+    for k, v in rules.items():
+        values = []
+        for index, row in df.iterrows():
+            if v(row):
+                values.append(row['end_time']-row['start_time'])
+        answer['jct_'+k] = round(sum(values)/len(values), 4)
+
+    return answer
+
+def simulate_run(parameters, rules):
     code_start = time.perf_counter()
 
     '''Logger Setting'''
@@ -64,29 +78,30 @@ def simulate_run(parameters):
     Sweep ON: Run All Scheduler Policies in One Experiment
     Sweep OFF: Run Dedicated Scheduler Policy (Default)
     '''
-    if args.sweep:
+    if parameters['sweep']:
         process_num = os.cpu_count()
         all_args_list = []
         for policy in utils.get_available_schedulers():
             if policy == 'qssf':
                 for i in range(len(vc_dict)):
-                    all_args_list.append((trace, CLUSTER.vc_list[i], args.placer, log_dir, "SpawnPoolWorker-"+str(i+1), args, policy, start_ts, estimator))
+                    all_args_list.append((trace, CLUSTER.vc_list[i], parameters['placer'], log_dir, "SpawnPoolWorker-"+str(i+1), parameters, policy, start_ts, estimator))
             else:
                 for i in range(len(vc_dict)):
-                    all_args_list.append((trace, CLUSTER.vc_list[i], args.placer,log_dir, "SpawnPoolWorker-"+str(i+1), args, policy, start_ts))
+                    all_args_list.append((trace, CLUSTER.vc_list[i], parameters['placer'],log_dir, "SpawnPoolWorker-"+str(i+1), parameters, policy, start_ts))
     else:
-        if args.processes is None:
+        if parameters['processes'] is None:
             process_num = min(len(CLUSTER.vc_list), os.cpu_count())
         else:
-            process_num = args.processes
+            process_num = parameters['processes']
 
         all_args_list = []
         for i in range(len(vc_dict)):
-            if args.scheduler == 'qssf':
-                all_args_list.append((trace, CLUSTER.vc_list[i], args.placer, log_dir,  "SpawnPoolWorker-"+str(i+1), args, args.scheduler, start_ts, estimator))
+            if parameters['scheduler'] == 'qssf':
+                all_args_list.append((trace, CLUSTER.vc_list[i], parameters['placer'], log_dir,  "SpawnPoolWorker-"+str(i+1), parameters, parameters['scheduler'], start_ts, estimator))
             else:
-                all_args_list.append((trace, CLUSTER.vc_list[i], args.placer, log_dir, "SpawnPoolWorker-"+str(i+1), args, args.scheduler, start_ts))
-
+                all_args_list.append((trace, CLUSTER.vc_list[i], parameters['placer'], log_dir, "SpawnPoolWorker-"+str(i+1), parameters, parameters['scheduler'], start_ts))
+    
+    '''多线程运行'''
     process_num = len(all_args_list)
     results = []
     pool = multiprocessing.Pool(process_num)
@@ -98,47 +113,34 @@ def simulate_run(parameters):
     pool.join()## join函数等待所有子进程结束，才会执行主进程之后的代码
     print('-----end------')
 
-    if args.sweep:
+    if parameters['sweep']:
         for policy in utils.get_available_schedulers():
             utils.cluster_concatenate(
-                policy, args.placer, log_dir, args.trace_dir)
+                policy, parameters['placer'], log_dir, parameters['trace_dir'])
     else:
         utils.cluster_concatenate(
-            args.scheduler, args.placer, log_dir, args.trace_dir)
-    utils.cluster_analysis(args.placer, log_dir, args.trace_dir)
+            parameters['scheduler'], parameters['placer'], log_dir, parameters['trace_dir'])
+    utils.cluster_analysis(parameters['placer'], log_dir, parameters['trace_dir'])
     
     #main logger
-    logger = create_logger("main_process",log_dir, args)
+    logger = utils.create_logger("main_process",log_dir, parameters)
     logger.info(f'Execution Time: {round(time.perf_counter() - code_start, 2)}s')
 
+    '''处理数据'''
+    df_list = []
+    files_path = "./log/Philly/logfile/qssf/results"
+    files = os.listdir(files_path)
+    for file in files:
+        file_path = os.path.join(files_path,file)
+        df = pd.read_csv(file_path, encoding='gbk')
+        df_list.append(df)
+    df = pd.concat(df_list)
+    # 计算平均等待时间和jct
+    queue = get_average_queue(rules, df)
+    jct = get_average_jct(rules, df)
+    results = dict(queue, **jct)
     
-
-def simulate():
-    parser = argparse.ArgumentParser(description='Simulator')
-    parser.add_argument('-e', '--experiment-name', default='Philly',
-                        type=str, help='Experiment Name')
-    parser.add_argument('-t', '--trace-dir', default='./data/Philly',
-                        type=str, help='Trace File Directory')
-    parser.add_argument('-l', '--log-dir', default='./log',
-                        type=str, help='Log Directory')
-    parser.add_argument('-s', '--scheduler', default='qssf',
-                        choices=utils.get_available_schedulers(), type=str, help='Scheduler Algorithm')
-    parser.add_argument('-p', '--placer', default='consolidate',
-                        choices=utils.get_available_placers(), type=str, help='Placer Algorithm')
-    parser.add_argument('--sweep', action='store_true', default=False,
-                        help='Run All Scheduler Policies in One Time')
-    parser.add_argument('-j', '--processes', type=int, default=None,
-                        help=('Number of processes to use in multiprocessing.Pool'
-                              '(use as many as available if not specified)'))
-    parser.add_argument('--timeout', default=1209600, type=int,
-                        help='Timeout (in seconds), default 14 days')
-    parser.add_argument('--num_gpus_per_node', type=int, default=8,
-                        help=('Number of GPUs per node'))
-    parser.add_argument('--num_cpus_per_node', type=int, default=96,
-                        help=('Number of CPU cores per node'))
-
-    args = parser.parse_args()
-    simulate_run(args)
+    return results
 
 if __name__ == '__main__':
     #输入:判断条件：某类任务的jct
@@ -148,10 +150,20 @@ if __name__ == '__main__':
         'trace_dir':'./data/Philly',
         'log_dir':'./log',
         'scheduler':'qssf',
+        'placer':'consolidate',
         'sweep':False,
         'processes':None,
         'timeout':1209600,
         'num_gpus_per_node':8,
         'num_cpus_per_node':96
     }
-    simulate()
+
+    rules = {'x>0': lambda x : x['gpu_num'] > 0,
+            'x>1': lambda x : x['gpu_num'] > 1,
+            'x>2': lambda x : x['gpu_num'] > 2,
+            'x>3': lambda x : x['gpu_num'] > 3,
+            'x>4': lambda x : x['gpu_num'] > 4}
+
+    results = simulate_run(parameters, rules)
+
+    print(results)
